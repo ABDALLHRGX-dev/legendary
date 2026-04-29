@@ -1,163 +1,82 @@
-name: Build Legendary Android ARM64
+name: Legendary Android ARM64 Binary
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-      - master
+    branches: [ '*' ]
   pull_request:
-
-env:
-  PYTHONUNBUFFERED: "1"
-  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    branches: [ '*' ]
 
 jobs:
-  build:
-    name: Build on ARM64
+  pyinstaller-android-arm64:
     runs-on: ubuntu-24.04-arm
 
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+    env:
+      UV_SYSTEM_PYTHON: 1
+      PYTHONOPTIMIZE: 1
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
-          cache: "pip"
+          python-version-file: "pyproject.toml"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            git \
-            curl \
-            wget \
-            zip \
-            unzip \
-            build-essential \
-            clang \
-            pkg-config \
-            patchelf \
-            libssl-dev \
-            libffi-dev \
-            python3-dev \
-            rustc \
-            cargo
+            binutils \
+            upx-ucl \
+            patchelf
 
-      - name: Show environment info
+      - name: Install build dependencies
         run: |
-          uname -a
-          python --version
-          pip --version
-          rustc --version
-          cargo --version
+          uv sync --extra pyinstaller_build --no-install-local
 
-      - name: Upgrade Python build tools
+      - name: Optional WebView dependencies
         run: |
-          python -m pip install --upgrade \
-            pip \
-            setuptools \
-            wheel \
-            build \
-            maturin
+          uv sync --extra webview --no-install-local --inexact || true
 
-      - name: Install project requirements
+      - name: Build ARM64 binary
+        working-directory: legendary
         run: |
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          fi
+          uv run --module PyInstaller \
+            --onefile \
+            --name legendary \
+            --strip \
+            cli.py
 
-      - name: Build and install Legendary
+      - name: Verify binary
         run: |
-          pip install . --no-deps
+          file legendary/dist/legendary
+          chmod +x legendary/dist/legendary
+          ./legendary/dist/legendary --help || true
 
-      - name: Build wheel
+      - name: Compress binary
         run: |
-          python -m build --wheel
-
-      - name: Build source distribution
-        run: |
-          python -m build --sdist
-
-      - name: Debug installed files
-        run: |
-          echo "===== Pip Show ====="
-          python -m pip show legendary || true
-
-          echo "===== Python Site-Packages ====="
-          python -c "import site; print(site.getsitepackages())" || true
-
-          echo "===== Search for Legendary Binary ====="
-          find / -name legendary 2>/dev/null | head -50 || true
-
-          echo "===== Python Modules ====="
-          python -c "import pkgutil; print([m.name for m in pkgutil.iter_modules() if 'legendary' in m.name.lower()])" || true
-
-      - name: Test Legendary CLI
-        run: |
-          set -e
-
-          if command -v legendary >/dev/null 2>&1; then
-            echo "Using system binary:"
-            legendary --help
-
-          elif [ -f ~/.local/bin/legendary ]; then
-            echo "Using ~/.local/bin/legendary"
-            ~/.local/bin/legendary --help
-
-          elif python -c "import legendary" 2>/dev/null; then
-            echo "Using Python module"
-            python -m legendary --help || python -m legendary.cli --help
-
-          else
-            echo "Legendary install failed"
-            exit 1
-          fi
-
-      - name: Package standalone release
-        run: |
-          mkdir -p release/bin
-
-          if command -v legendary >/dev/null 2>&1; then
-            cp "$(which legendary)" release/bin/legendary
-
-          elif [ -f ~/.local/bin/legendary ]; then
-            cp ~/.local/bin/legendary release/bin/legendary
-          fi
-
-          cp -r dist release/dist || true
+          mkdir -p release
+          cp legendary/dist/legendary release/legendary
+          chmod +x release/legendary
 
           cat > release/run_legendary.sh << 'EOF'
           #!/usr/bin/env bash
           DIR="$(cd "$(dirname "$0")" && pwd)"
-
-          if [ -x "$DIR/bin/legendary" ]; then
-            "$DIR/bin/legendary" "$@"
-          else
-            python -m legendary "$@" || python -m legendary.cli "$@"
-          fi
+          "$DIR/legendary" "$@"
           EOF
 
           chmod +x release/run_legendary.sh
 
-      - name: Compress release package
-        run: |
-          tar -czf legendary-android-arm64.tar.gz release
+          tar -czf legendary-android-arm64-binary.tar.gz -C release .
 
-      - name: Upload wheel and source artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
-          name: legendary-dist
+          name: ubuntu-24.04-arm64-legendary-binary
           path: |
-            dist/*.whl
-            dist/*.tar.gz
-
-      - name: Upload packaged release
-        uses: actions/upload-artifact@v4
-        with:
-          name: legendary-android-arm64
-          path: legendary-android-arm64.tar.gz
+            legendary/dist/legendary
+            legendary-android-arm64-binary.tar.gz
