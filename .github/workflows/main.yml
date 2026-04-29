@@ -1,4 +1,4 @@
-name: shut ur face
+name: js stop fcking with 👺 
 
 on:
   workflow_dispatch:
@@ -19,12 +19,24 @@ jobs:
           mkdir -p build dist
           python -m pip install --upgrade pip
           pip install wheel setuptools
-          # نثبت فقط المكتبات التي هي Pure Python داخل المجلد
           pip install requests packaging --target build/
           cp -r legendary build/
 
           cat > build/__main__.py << 'EOF'
-          import sys
+          import sys, os, importlib.util
+          termux_site_packages = '/data/data/com.termux/files/usr/lib/python3.12/site-packages'
+          if termux_site_packages not in sys.path:
+              sys.path.append(termux_site_packages)
+          
+          try:
+              import Cryptodome
+          except ImportError:
+              try:
+                  import pycryptodomex as Cryptodome
+                  sys.modules['Cryptodome'] = Cryptodome
+              except ImportError:
+                  pass
+
           import importlib.metadata
           orig = importlib.metadata.version
           def hooked(name):
@@ -32,6 +44,7 @@ jobs:
               try: return orig(name)
               except: return '0.0.0'
           importlib.metadata.version = hooked
+          
           from legendary.cli import main
           if __name__ == '__main__':
               sys.exit(main())
@@ -43,7 +56,6 @@ jobs:
           find build -type d -name "*.egg-info" -exec rm -rf {} +
           find build -name "*.pyc" -delete
           find build -name "*.so" -delete
-          find build -name "*.pyd" -delete
           find build -name "*.exe" -delete
 
           python -m zipapp build -o dist/legendary -p "/data/data/com.termux/files/usr/bin/python3" --compress
