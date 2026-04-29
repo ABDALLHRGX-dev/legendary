@@ -26,6 +26,13 @@ jobs:
 
           cat > build/__main__.py << 'EOF'
           import sys
+          import importlib.metadata
+          orig = importlib.metadata.version
+          def hooked(name):
+              if name in ('legendary-gl', 'legendary'): return '0.20.34'
+              try: return orig(name)
+              except: return '0.0.0'
+          importlib.metadata.version = hooked
           from legendary.cli import main
           if __name__ == '__main__':
               sys.exit(main())
