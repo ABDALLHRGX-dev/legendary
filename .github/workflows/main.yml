@@ -1,100 +1,55 @@
-name: Build Legendary Android ARM64 (Termux/Bionic)
+name: Legendary Termux Compatible Build
 
 on:
   workflow_dispatch:
   push:
     branches: [ '*' ]
-  pull_request:
-    branches: [ '*' ]
 
 jobs:
-  build-android-arm64:
+  build:
     runs-on: ubuntu-latest
 
-    env:
-      ANDROID_NDK_VERSION: r26d
-      API_LEVEL: 24
-
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install host dependencies
+      - name: Install tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            wget unzip git zip \
-            clang lld cmake make \
-            pkg-config patchelf \
-            python3-dev
+          python -m pip install --upgrade pip
+          pip install wheel setuptools
 
-      - name: Download Android NDK
+      - name: Install dependencies
         run: |
-          wget https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-          unzip android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-          echo "ANDROID_NDK_HOME=$PWD/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+          pip install -r requirements.txt || true
+          pip install requests packaging
 
-      - name: Setup Android toolchain
+      - name: Build zipapp for Termux
         run: |
-          TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+          mkdir -p build dist
+          cp -r legendary build/
 
-          echo "CC=$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang" >> $GITHUB_ENV
-          echo "CXX=$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang++" >> $GITHUB_ENV
-          echo "AR=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
-          echo "RANLIB=$TOOLCHAIN/bin/llvm-ranlib" >> $GITHUB_ENV
-          echo "STRIP=$TOOLCHAIN/bin/llvm-strip" >> $GITHUB_ENV
+          cat > build/__main__.py << 'EOF'
+from legendary.cli import main
+main()
+EOF
 
-      - name: Upgrade build tools
+          python -m zipapp build \
+            -o dist/legendary \
+            -p "/data/data/com.termux/files/usr/bin/python3" \
+            --compress
+
+      - name: Make package
         run: |
-          python -m pip install --upgrade \
-            pip setuptools wheel build cython pyinstaller
+          chmod +x dist/legendary
+          tar -czf legendary-termux.tar.gz -C dist legendary
 
-      - name: Install Python dependencies
-        run: |
-          pip install requests packaging pyinstaller
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt || true
-          fi
-
-      - name: Build Android-compatible binary
-        working-directory: legendary
-        run: |
-          pyinstaller \
-            --onefile \
-            --name legendary \
-            --distpath ../dist \
-            cli.py
-
-      - name: Verify binary type
-        run: |
-          file dist/legendary || true
-          readelf -h dist/legendary | grep Machine || true
-
-      - name: Package release
-        run: |
-          mkdir -p release
-          cp dist/legendary release/legendary
-          chmod +x release/legendary
-
-          cat > release/run_legendary.sh << 'EOF'
-          #!/data/data/com.termux/files/usr/bin/bash
-          DIR="$(cd "$(dirname "$0")" && pwd)"
-          "$DIR/legendary" "$@"
-          EOF
-
-          chmod +x release/run_legendary.sh
-
-          tar -czf legendary-android-arm64-termux.tar.gz -C release .
-
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: legendary-android-arm64-termux
+          name: legendary-termux
           path: |
             dist/legendary
-            legendary-android-arm64-termux.tar.gz
+            legendary-termux.tar.gz
