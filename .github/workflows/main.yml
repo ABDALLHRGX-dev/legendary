@@ -1,4 +1,4 @@
-name: js stop fcking with 👺 
+name: I typed workflow code more than legendary code🥀🥀🥀 
 
 on:
   workflow_dispatch:
@@ -18,16 +18,17 @@ jobs:
         run: |
           mkdir -p build dist
           python -m pip install --upgrade pip
-          pip install wheel setuptools
-          pip install requests packaging --target build/
+          pip install wheel setuptools requests packaging --target build/
           cp -r legendary build/
 
           cat > build/__main__.py << 'EOF'
-          import sys, os, importlib.util
-          termux_site_packages = '/data/data/com.termux/files/usr/lib/python3.12/site-packages'
-          if termux_site_packages not in sys.path:
-              sys.path.append(termux_site_packages)
+          import sys, os, site
           
+          # استدعاء مسارات النظام الخارجية داخل ترمكس
+          p = "/data/data/com.termux/files/usr/lib/python3.12/site-packages"
+          if os.path.exists(p): sys.path.insert(0, p)
+          
+          # محاولة استيراد التشفير من النظام
           try:
               import Cryptodome
           except ImportError:
