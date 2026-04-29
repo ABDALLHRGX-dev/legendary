@@ -1,4 +1,4 @@
-name: Legendary Termux Compatible Build
+name: shut the fuck up
 
 on:
   workflow_dispatch:
@@ -26,9 +26,10 @@ jobs:
           pip install -r requirements.txt || true
           pip install requests packaging
 
-      - name: Build zipapp for Termux
+      - name: Build maximum optimized zipapp for Termux
         run: |
           mkdir -p build dist
+
           cp -r legendary build/
 
           cat > build/__main__.py << 'EOF'
@@ -36,14 +37,15 @@ from legendary.cli import main
 main()
 EOF
 
-          python -m zipapp build \
+          python -OO -m zipapp build \
             -o dist/legendary \
             -p "/data/data/com.termux/files/usr/bin/python3" \
             --compress
 
+          chmod +x dist/legendary
+
       - name: Make package
         run: |
-          chmod +x dist/legendary
           tar -czf legendary-termux.tar.gz -C dist legendary
 
       - name: Upload artifacts
