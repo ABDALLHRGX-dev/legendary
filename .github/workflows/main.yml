@@ -1,4 +1,4 @@
-name: sybau
+name: Legendary Termux Optimized Build
 
 on:
   workflow_dispatch:
@@ -20,7 +20,7 @@ jobs:
           mkdir -p build dist
           python -m pip install --upgrade pip
           pip install wheel setuptools
-          pip install -r requirements.txt --target build/
+          [ -f requirements.txt ] && pip install -r requirements.txt --target build/ || true
           pip install requests packaging --target build/
           cp -r legendary build/
 
