@@ -1,4 +1,4 @@
-name: I typed workflow code more than legendary code🥀🥀🥀 
+name: Legendary Termux Optimized Build
 
 on:
   workflow_dispatch:
@@ -18,25 +18,20 @@ jobs:
         run: |
           mkdir -p build dist
           python -m pip install --upgrade pip
-          pip install wheel setuptools requests packaging --target build/
+          pip install requests packaging --target build/
           cp -r legendary build/
 
           cat > build/__main__.py << 'EOF'
-          import sys, os, site
+          import sys, os
+          tp = "/data/data/com.termux/files/usr/lib/python3.12/site-packages"
+          if tp not in sys.path: sys.path.append(tp)
           
-          # استدعاء مسارات النظام الخارجية داخل ترمكس
-          p = "/data/data/com.termux/files/usr/lib/python3.12/site-packages"
-          if os.path.exists(p): sys.path.insert(0, p)
-          
-          # محاولة استيراد التشفير من النظام
-          try:
-              import Cryptodome
-          except ImportError:
-              try:
-                  import pycryptodomex as Cryptodome
-                  sys.modules['Cryptodome'] = Cryptodome
-              except ImportError:
-                  pass
+          import importlib.util
+          for mod in ['Cryptodome', 'pycryptodomex']:
+              if importlib.util.find_spec(mod):
+                  m = __import__(mod)
+                  sys.modules['Cryptodome'] = m
+                  break
 
           import importlib.metadata
           orig = importlib.metadata.version
