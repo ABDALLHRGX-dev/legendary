@@ -21,12 +21,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install wheel setuptools
           [ -f requirements.txt ] && pip install -r requirements.txt --target build/ || true
-          pip install requests packaging --target build/
+          pip install requests packaging pycryptodomex --target build/
           cp -r legendary build/
 
           cat > build/__main__.py << 'EOF'
           import sys
           import importlib.metadata
+          try:
+              import Cryptodome
+          except ImportError:
+              try:
+                  import Cryptodome as _
+              except ImportError:
+                  from Cryptodome import __path__ as _
           orig = importlib.metadata.version
           def hooked(name):
               if name in ('legendary-gl', 'legendary'): return '0.20.34'
