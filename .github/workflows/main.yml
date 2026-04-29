@@ -1,4 +1,4 @@
-name: Legendary Termux Optimized Build
+name: shut ur face
 
 on:
   workflow_dispatch:
@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -20,20 +19,13 @@ jobs:
           mkdir -p build dist
           python -m pip install --upgrade pip
           pip install wheel setuptools
-          [ -f requirements.txt ] && pip install -r requirements.txt --target build/ || true
-          pip install requests packaging pycryptodomex --target build/
+          # نثبت فقط المكتبات التي هي Pure Python داخل المجلد
+          pip install requests packaging --target build/
           cp -r legendary build/
 
           cat > build/__main__.py << 'EOF'
           import sys
           import importlib.metadata
-          try:
-              import Cryptodome
-          except ImportError:
-              try:
-                  import Cryptodome as _
-              except ImportError:
-                  from Cryptodome import __path__ as _
           orig = importlib.metadata.version
           def hooked(name):
               if name in ('legendary-gl', 'legendary'): return '0.20.34'
@@ -46,18 +38,13 @@ jobs:
           EOF
 
           find build -type d -name "tests" -exec rm -rf {} +
-          find build -type d -name "testing" -exec rm -rf {} +
           find build -type d -name "__pycache__" -exec rm -rf {} +
           find build -type d -name "*.dist-info" -exec rm -rf {} +
           find build -type d -name "*.egg-info" -exec rm -rf {} +
           find build -name "*.pyc" -delete
-          find build -name "*.pyo" -delete
+          find build -name "*.so" -delete
           find build -name "*.pyd" -delete
           find build -name "*.exe" -delete
-          find build -name "*.txt" -delete
-          find build -name "README*" -delete
-          find build -name "AUTHORS*" -delete
-          find build -name "LICENSE*" -delete
 
           python -m zipapp build -o dist/legendary -p "/data/data/com.termux/files/usr/bin/python3" --compress
           chmod +x dist/legendary
